@@ -14,7 +14,7 @@
 #include <string>
 
 #define DEVICEID 0
-#define ITERS 10
+#define ITERS 1
 
 int main(int argc, char **argv) {
 	//parse input parameters
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 	int n = atoi(argv[2]);
 	long nnz = atoi(argv[4]);
 	long nnz_test = atoi(argv[5]);
-	float lambda = atof(argv[6]);
+	dtype lambda = atof(argv[6]);
 	int X_BATCH = atoi(argv[7]);
 	int THETA_BATCH = atoi(argv[8]);
 	std::string DATA_DIR(argv[9]);
@@ -50,9 +50,9 @@ int main(int argc, char **argv) {
 	cudacall(cudaMallocHost( (void** ) &csrRowIndexHostPtr, (m + 1) * sizeof(csrRowIndexHostPtr[0])) );
 	int* csrColIndexHostPtr;
 	cudacall(cudaMallocHost( (void** ) &csrColIndexHostPtr, nnz * sizeof(csrColIndexHostPtr[0])) );
-	float* csrValHostPtr;
+	dtype* csrValHostPtr;
 	cudacall(cudaMallocHost( (void** ) &csrValHostPtr, nnz * sizeof(csrValHostPtr[0])) );
-	float* cscValHostPtr;
+	dtype* cscValHostPtr;
 	cudacall(cudaMallocHost( (void** ) &cscValHostPtr, nnz * sizeof(cscValHostPtr[0])) );
 	int* cscRowIndexHostPtr;
 	cudacall(cudaMallocHost( (void** ) &cscRowIndexHostPtr, nnz * sizeof(cscRowIndexHostPtr[0])) );
@@ -62,43 +62,76 @@ int main(int argc, char **argv) {
 	cudacall(cudaMallocHost( (void** ) &cooRowIndexHostPtr, nnz * sizeof(cooRowIndexHostPtr[0])) );
 
 	//calculate X from thetaT first, need to initialize thetaT
-	float* thetaTHost;
+	dtype* thetaTHost;
 	cudacall(cudaMallocHost( (void** ) &thetaTHost, n * f * sizeof(thetaTHost[0])) );
 
-	float* XTHost;
+	dtype* XTHost;
 	cudacall(cudaMallocHost( (void** ) &XTHost, m * f * sizeof(XTHost[0])) );
 
+	/* But I comment out here to use same initial values as test_case2			----Xuan
 	//initialize thetaT on host
 	unsigned int seed = 0;
 	srand (seed);
 	for (int k = 0; k < n * f; k++)
-		thetaTHost[k] = 0.2*((float) rand() / (float)RAND_MAX);
+		thetaTHost[k] = 0.2*((dtype) rand() / (dtype)RAND_MAX);
 	//CG needs to initialize X as well
 	for (int k = 0; k < m * f; k++)
-		XTHost[k] = 0;//0.1*((float) rand() / (float)RAND_MAX);;
+		XTHost[k] = 0;//0.1*((dtype) rand() / (dtype)RAND_MAX);;
+
+	*/
+	FILE * xinitfile = fopen((DATA_DIR + "/XT.init.bin").c_str(), "rb");
+	FILE * thetainitfile = fopen((DATA_DIR + "thetaT.init.bin").c_str(), "rb");
+	float* thetaTHost_tmp;
+	float* XTHost_tmp;
+	cudacall(cudaMallocHost( (void** ) &thetaTHost_tmp, n * f * sizeof(thetaTHost_tmp[0])) );
+	cudacall(cudaMallocHost( (void** ) &XTHost_tmp, m * f * sizeof(XTHost_tmp[0])) );
+	fread(XTHost_tmp, sizeof(dtype), m*f, xinitfile);
+	fread(thetaTHost_tmp, sizeof(dtype), n*f, thetainitfile);
+	fclose(xinitfile);
+	fclose(thetainitfile);
+	for (int i = 0; i < m * f; i++)
+		XTHost[i] = XTHost_tmp[i];
+	for (int i = 0; i < n * f; i++)
+		thetaTHost[i] = thetaTHost_tmp[i];
+	cudaFreeHost(XTHost_tmp);
+	cudaFreeHost(thetaTHost_tmp);
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	printf("*******start loading training and testing sets to host.\n");
 	//testing set
 	int* cooRowIndexTestHostPtr = (int *) malloc(
 			nnz_test * sizeof(cooRowIndexTestHostPtr[0]));
 	int* cooColIndexTestHostPtr = (int *) malloc(
 			nnz_test * sizeof(cooColIndexTestHostPtr[0]));
-	float* cooValHostTestPtr = (float *) malloc(nnz_test * sizeof(cooValHostTestPtr[0]));
+	dtype* cooValHostTestPtr = (dtype *) malloc(nnz_test * sizeof(cooValHostTestPtr[0]));
 
 	struct timeval tv0;
 	gettimeofday(&tv0, NULL);
 
-	
+	float* cooValHostTestPtr_tmp;
+	cudacall(cudaMallocHost( (void** ) &cooValHostTestPtr_tmp, nnz * sizeof(cooValHostTestPtr_tmp[0])) );
 	loadCooSparseMatrixBin( (DATA_DIR + "/R_test_coo.data.bin").c_str(), (DATA_DIR + "/R_test_coo.row.bin").c_str(), 
 							(DATA_DIR + "/R_test_coo.col.bin").c_str(),
-			cooValHostTestPtr, cooRowIndexTestHostPtr, cooColIndexTestHostPtr, nnz_test);
+			cooValHostTestPtr_tmp, cooRowIndexTestHostPtr, cooColIndexTestHostPtr, nnz_test);
+    for (int i = 0; i < nnz; i++) cooValHostTestPtr[i] = cooValHostTestPtr_tmp[i];
+	cudaFreeHost(cooValHostTestPtr_tmp);
 
+
+	float* csrValHostPtr_tmp;
+	cudacall(cudaMallocHost( (void** ) &csrValHostPtr_tmp, nnz * sizeof(csrValHostPtr_tmp[0])) );
     loadCSRSparseMatrixBin( (DATA_DIR + "/R_train_csr.data.bin").c_str(), (DATA_DIR + "/R_train_csr.indptr.bin").c_str(),
 							(DATA_DIR + "/R_train_csr.indices.bin").c_str(),
-    		csrValHostPtr, csrRowIndexHostPtr, csrColIndexHostPtr, m, nnz);
+    		csrValHostPtr_tmp, csrRowIndexHostPtr, csrColIndexHostPtr, m, nnz);
+    for (int i = 0; i < nnz; i++) csrValHostPtr[i] = csrValHostPtr_tmp[i];
+	cudaFreeHost(csrValHostPtr_tmp);
 
+	float* cscValHostPtr_tmp;
+	cudacall(cudaMallocHost( (void** ) &cscValHostPtr_tmp, nnz * sizeof(cscValHostPtr_tmp[0])) );
     loadCSCSparseMatrixBin( (DATA_DIR + "/R_train_csc.data.bin").c_str(), (DATA_DIR + "/R_train_csc.indices.bin").c_str(),
 							(DATA_DIR +"/R_train_csc.indptr.bin").c_str(),
-   		cscValHostPtr, cscRowIndexHostPtr, cscColIndexHostPtr, n, nnz);
+   		cscValHostPtr_tmp, cscRowIndexHostPtr, cscColIndexHostPtr, n, nnz);
+    for (int i = 0; i < nnz; i++) cscValHostPtr[i] = cscValHostPtr_tmp[i];
+	cudaFreeHost(cscValHostPtr_tmp);
 
     loadCooSparseMatrixRowPtrBin( (DATA_DIR + "/R_train_coo.row.bin").c_str(), cooRowIndexHostPtr, nnz);
 	
@@ -146,16 +179,16 @@ int main(int argc, char **argv) {
 			ITERS, X_BATCH, THETA_BATCH, DEVICEID);
 	printf("\ndoALS takes seconds: %.3f for F = %d\n", seconds() - t0, f);
 
-	/*
+
 	//write out the model	
-	FILE * xfile = fopen("XT-Yahoo.data", "wb");
-	FILE * thetafile = fopen("thetaT-Yahoo.data", "wb");
-	fwrite(XTHost, sizeof(float), m*f, xfile);
-	fwrite(thetaTHost, sizeof(float), n*f, thetafile);
+	FILE * xfile = fopen((DATA_DIR + "XT.data.bin").c_str(), "wb");
+	FILE * thetafile = fopen((DATA_DIR + "thetaT.data.bin").c_str(), "wb");
+	fwrite(XTHost, sizeof(dtype), m*f, xfile);
+	fwrite(thetaTHost, sizeof(dtype), n*f, thetafile);
 	fclose(xfile);
 	fclose(thetafile);
-	*/
 	
+
 
 	cudaFreeHost(csrRowIndexHostPtr);
 	cudaFreeHost(csrColIndexHostPtr);
