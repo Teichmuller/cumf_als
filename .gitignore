@@ -3,4 +3,7 @@
 **.o
 **.bin
 
-/data/*/*
+/data/ml10M/*
+!/data/ml10M/*.py
+/data/netflix/*
+!/data/netflix/*.py
