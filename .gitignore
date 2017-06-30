@@ -1,9 +1,9 @@
-/Debug/
+Debug/
 
 **.o
 **.bin
 
-/data/ml10M/*
-!/data/ml10M/*.py
-/data/netflix/*
-!/data/netflix/*.py
+data/ml10M/*
+!data/ml10M/prepare_ml10M_data.py
+data/netflix/*
+!data/netflix/prepare_netflix_data.py
