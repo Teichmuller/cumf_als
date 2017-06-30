@@ -289,7 +289,7 @@ __global__ void MAE(const dtype * csrVal, const int* cooRowIndex,
 		//if(i%1000000==0) printf("error[%d]: %f.\n", i, e);
 	}
 }
-
+//
 //using fp16 as thetaT's format
 //using fp16 in computate seems causing register pressure since half intrinsics cannot be used.
 //using fp16 in compute also does not converge. not sure if the code is incorrect, or ALS cannot tolerate half-precision
