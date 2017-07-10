@@ -814,7 +814,7 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 		const int* cscRowIndexHostPtr, const int* cscColIndexHostPtr, const dtype* cscValHostPtr,
 		const int* cooRowIndexHostPtr, dtype* thetaTHost, dtype * XTHost,
 		const int * cooRowIndexTestHostPtr, const int * cooColIndexTestHostPtr, const dtype * cooValHostTestPtr,
-		const int m, const int n, const int f, const long nnz, const long nnz_test, const dtype lambda,
+		const int m, const int n, const int f, const long nnz, const long nnz_test, const dtype lambda, const dtype mu,
 		const int ITERS, const int X_BATCH, const int THETA_BATCH, const int DEVICEID);
 
 #endif /* ALS_H_ */

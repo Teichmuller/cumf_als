@@ -55,8 +55,25 @@ void saveDeviceFloatArrayToFile(string fileName, int size, dtype* d_array){
 	fclose(outfile);
 	cudaFreeHost(h_array);
 }
+__global__ void Smoothing(const int batch_offset, const int m, const int f, const dtype mu,
+		dtype * ythetaT, dtype * XT)
+{
+	int row = batch_offset + blockIdx.x;
+	int col = threadIdx.x;
+	int pos = row * f + col;
+	dtype addend = 0;
+	if (row != 0) {
+		int prev_pos = (row - 1) * f + col;
+		addend += XT[prev_pos];
+	}
+	if (row != m - 1) {
+		int next_pos = (row + 1) * f + col;
+		addend += XT[next_pos];
+	}
+	ythetaT[pos] += mu * addend;
+}
 int updateX(const int batch_size, const int batch_offset, dtype * ythetaT, dtype * tt, dtype * XT,
-		cublasHandle_t handle, const int m, const int n, const int f, const int nnz,
+		cublasHandle_t handle, const int m, const int n, const int f, const int nnz, const dtype mu,
 		dtype** devPtrTTHost, dtype **devPtrYthetaTHost){
 	#ifdef DEBUG
 	dtype elapsed;
@@ -91,6 +108,9 @@ int updateX(const int batch_size, const int batch_offset, dtype * ythetaT, dtype
 	#endif
 
 	dtype **devPtrYthetaT = 0;
+
+	Smoothing<<<batch_size, f>>>(batch_offset, m, f, mu, ythetaT, XT);
+	cudaThreadSynchronize();
 
 	for (int k = 0; k < batch_size; k++) {
 		devPtrYthetaTHost[k] = &ythetaT[batch_offset * f + k * f];
@@ -657,7 +677,7 @@ get_hermitian100(const int batch_offset, dtype2* tt,
  */
 __global__ void
 get_hermitianT10(const int batch_offset, dtype* tt,
-		const int* csrRowIndex, const int* csrColIndex, const dtype lambda, const int m, const int F,
+		const int* csrRowIndex, const int* csrColIndex, const dtype lambda, const dtype mu, const int m, const int F,
 		const dtype* __restrict__ thetaT) {
 	extern __shared__ dtype2 thetaTemp [];
 	int row = blockIdx.x + batch_offset;
@@ -734,8 +754,12 @@ get_hermitianT10(const int batch_offset, dtype* tt,
 			}
 			//regularization
 			if(tile_x == tile_y){
+				dtype addend = lambda + (row != 0 && row != m - 1 ? 2 * mu : mu);
 				for(int k = 0; k < T10; k++)
-					tt[index + (tile_x+k)*(1+F)] +=  lambda;
+					if (row != 0 && row != m - 1)
+						tt[index + (tile_x+k)*(1+F)] +=  addend;
+					else
+						tt[index + (tile_x+k)*(1+F)] +=  addend;
 			}
 		}
 	}
@@ -746,7 +770,8 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 		const int* cscRowIndexHostPtr, const int* cscColIndexHostPtr, const dtype* cscValHostPtr,
 		const int* cooRowIndexHostPtr, dtype* thetaTHost, dtype* XTHost,
 		const int * cooRowIndexTestHostPtr, const int * cooColIndexTestHostPtr, const dtype * cooValHostTestPtr,
-		const int m, const int n, const int f, const long nnz, const long nnz_test, const dtype lambda,
+		const int m, const int n, const int f, const long nnz, const long nnz_test,
+		const dtype lambda, const dtype mu,
 		const int ITERS, const int X_BATCH, const int THETA_BATCH, const int DEVICEID)
 {
 	cudaSetDevice(DEVICEID);
@@ -908,7 +933,7 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 			}
 			else
 				get_hermitianT10<<<batch_size, block_dim, SCAN_BATCH * f/2*sizeof(dtype2)>>>
-					(batch_offset, tt, csrRowIndex, csrColIndex, lambda, m, f, thetaT);
+					(batch_offset, tt, csrRowIndex, csrColIndex, lambda, mu, m, f, thetaT);
 			cudaDeviceSynchronize();
 			cudaCheckError();
 			#ifdef DEBUG
@@ -930,7 +955,7 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 			cudacall(cudaMallocHost( (void** ) &devPtrTTHost, batch_size * sizeof(*devPtrTTHost) ) );
 			dtype **devPtrYthetaTHost = 0;
 			cudacall(cudaMallocHost( (void** ) &devPtrYthetaTHost, batch_size * sizeof(*devPtrYthetaTHost) ) );
-			updateX(batch_size, batch_offset, ythetaT, tt, XT, handle, m, n, f, nnz, devPtrTTHost, devPtrYthetaTHost);	
+			updateX(batch_size, batch_offset, ythetaT, tt, XT, handle, m, n, f, nnz, mu, devPtrTTHost, devPtrYthetaTHost);
 			cudacall(cudaFreeHost(devPtrTTHost));
 			cudacall(cudaFreeHost(devPtrYthetaTHost));
 			#endif
@@ -1026,7 +1051,7 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 			}
 			else
 				get_hermitianT10<<<batch_size, block_dim, SCAN_BATCH*f*sizeof(dtype)>>>
-					(batch_offset, xx, cscColIndex, cscRowIndex, lambda, n, f, XT);
+					(batch_offset, xx, cscColIndex, cscRowIndex, lambda, 0., n, f, XT);
 			cudaDeviceSynchronize();
 			cudaCheckError();
 			#ifdef DEBUG
@@ -1098,6 +1123,17 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 
 		cudaDeviceSynchronize();
 		printf("--------- Train MAE in iter %d: %.12f\n", iter, (*rmse_train)/nnz);
+		dtype* error_train_host = 0;
+		cudacall(cudaMallocHost((void**)&error_train_host, error_size * sizeof(error_train_host[0])));
+		cudacall(cudaMemcpy(error_train_host, errors_train, error_size * sizeof(error_train_host[0]), cudaMemcpyDeviceToHost));
+		/*
+		printf("Test errors:\n");
+		for (int i = 0; i < error_size; i++) {
+			if (i % 10 == 0) printf("\n%d: ", i);
+			printf("%.8f ", error_train_host[i]);
+		}
+*/
+		cudacall(cudaFreeHost(error_train_host));
 		cudacall(cudaFree(errors_train));
 
 		
@@ -1130,6 +1166,24 @@ dtype doALS(const int* csrRowIndexHostPtr, const int* csrColIndexHostPtr, const 
 		cudaDeviceSynchronize();
 		final_rmse = (*rmse_test)/nnz_test;
 		printf("--------- Test MAE in iter %d: %.12f\n", iter, final_rmse);
+		dtype* error_test_host = 0;
+		cudacall(cudaMallocHost((void**)&error_test_host, error_size * sizeof(error_test_host[0])));
+		cudacall(cudaMemcpy(error_test_host, errors_test, error_size * sizeof(error_test_host[0]), cudaMemcpyDeviceToHost));
+		/*
+		printf("Test values:\n");
+		for (int i = 0; i < nnz_test; i++) {
+			if (i % 10 == 0) printf("\n%d: ", i);
+			printf("%.8f ", cooValHostTestPtr[i]);
+		}
+		printf("\n");
+		printf("Test errores:\n");
+		for (int i = 0; i < error_size; i++) {
+			if (i % 10 == 0) printf("\n%d: ", i);
+			printf("%.8f ", error_test_host[i]);
+		}
+		printf("\n");
+		*/
+		cudacall(cudaFreeHost(error_test_host));
 		cudacall(cudaFree(errors_test));
 //*/		
 	}
