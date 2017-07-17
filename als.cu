@@ -55,6 +55,7 @@ void saveDeviceFloatArrayToFile(string fileName, int size, dtype* d_array){
 	fclose(outfile);
 	cudaFreeHost(h_array);
 }
+
 __global__ void Smoothing(const int batch_offset, const int m, const int f, const dtype mu,
 		dtype * ythetaT, dtype * XT)
 {
@@ -72,6 +73,46 @@ __global__ void Smoothing(const int batch_offset, const int m, const int f, cons
 	}
 	ythetaT[pos] += mu * addend;
 }
+
+__global__ void Smoothing_rev1(const int batch_offset, const int m, const int f, const dtype mu,
+		dtype * ythetaT, dtype * XT)
+{
+	extern __shared__ dtype tempXT[];
+
+	int row = blockIdx.x + batch_offset;
+	int col = threadIdx.x;
+
+	int pos_start = row * f;
+
+	int pos = pos_start + col;
+	int prev_pos = pos - f;
+	int next_pos = pos + f;
+
+	int local_pos = col + f;
+	int local_prev_pos = col;
+	int local_next_pos = local_pos + f;
+	// gmem -> smem
+	tempXT[local_pos] = ythetaT[pos];
+	if (row != 0)
+		tempXT[local_prev_pos] = XT[prev_pos];
+	if (row != m - 1)
+		tempXT[local_next_pos] = XT[next_pos];
+	__syncthreads();
+	// calc
+	dtype addend = 0;
+	if (row != 0) {
+		addend += tempXT[local_prev_pos];
+	}
+	if (row != m - 1) {
+		addend += tempXT[local_next_pos];
+	}
+	tempXT[local_pos] += mu * addend;
+	__syncthreads();
+	// smem -> gmem
+	ythetaT[pos] = tempXT[local_pos];
+
+}
+
 int updateX(const int batch_size, const int batch_offset, dtype * ythetaT, dtype * tt, dtype * XT,
 		cublasHandle_t handle, const int m, const int n, const int f, const int nnz, const dtype mu,
 		dtype** devPtrTTHost, dtype **devPtrYthetaTHost){
@@ -109,7 +150,8 @@ int updateX(const int batch_size, const int batch_offset, dtype * ythetaT, dtype
 
 	dtype **devPtrYthetaT = 0;
 
-	Smoothing<<<batch_size, f>>>(batch_offset, m, f, mu, ythetaT, XT);
+	//Smoothing<<<batch_size, f>>>(batch_offset, m, f, mu, ythetaT, XT);
+	Smoothing_rev1<<<batch_size, f, 3 * f * sizeof(dtype)>>>(batch_offset, m, f, mu, ythetaT, XT);
 	cudaThreadSynchronize();
 
 	for (int k = 0; k < batch_size; k++) {

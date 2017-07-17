@@ -17,7 +17,7 @@
 				</extensions>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug" cleanCommand="rm -rf" description="" id="com.nvidia.cuda.ide.eight_zero.configuration.debug.540974756" name="Debug" parent="com.nvidia.cuda.ide.eight_zero.configuration.debug">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug,org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe" cleanCommand="rm -rf" description="" id="com.nvidia.cuda.ide.eight_zero.configuration.debug.540974756" name="Debug" parent="com.nvidia.cuda.ide.eight_zero.configuration.debug">
 					<folderInfo id="com.nvidia.cuda.ide.eight_zero.configuration.debug.540974756." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.tools.toolchain.eight_zero.exe.debug.487909464" name="CUDA Toolkit 8.0" superClass="com.nvidia.cuda.tools.toolchain.eight_zero.exe.debug">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.779785299" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
@@ -76,7 +76,7 @@
 				</extensions>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" cleanCommand="rm -rf" description="" id="com.nvidia.cuda.ide.eight_zero.configuration.release.1475328375" name="Release" parent="com.nvidia.cuda.ide.eight_zero.configuration.release">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release,org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe" cleanCommand="rm -rf" description="" id="com.nvidia.cuda.ide.eight_zero.configuration.release.1475328375" name="Release" parent="com.nvidia.cuda.ide.eight_zero.configuration.release">
 					<folderInfo id="com.nvidia.cuda.ide.eight_zero.configuration.release.1475328375." name="/" resourcePath="">
 						<toolChain id="com.nvidia.cuda.ide.toolchain.eight_zero.exe.release.1743363873" name="CUDA Toolkit 8.0" superClass="com.nvidia.cuda.ide.toolchain.eight_zero.exe.release">
 							<targetPlatform archList="all" binaryParser="com.nvidia.cuda.ide.elf;com.nvidia.cuda.ide.macho;com.nvidia.cuda.ide.cubin" id="com.nvidia.cuda.ide.targetPlatform.1413094204" isAbstract="false" name="Debug Platform" osList="linux,macosx" superClass="com.nvidia.cuda.ide.targetPlatform"/>
@@ -127,8 +127,8 @@
 		<configuration configurationName="Default">
 			<resource resourceType="PROJECT" workspacePath="/cumf_als"/>
 		</configuration>
-		<configuration configurationName="Debug"/>
 		<configuration configurationName="Release"/>
+		<configuration configurationName="Debug"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 	<storageModule moduleId="scannerConfiguration">
