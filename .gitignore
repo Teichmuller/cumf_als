@@ -1,5 +1,6 @@
 /Debug/
 /Release/
+/benchmark/__pycache__/
 
 **.o
 **.bin
