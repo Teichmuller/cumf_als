@@ -21,6 +21,8 @@
 #ifndef HOST_UTILITIES_H_
 #define HOST_UTILITIES_H_
 #include <sys/time.h>
+#include <iostream>
+#include <string>
 
 inline double seconds(){
     struct timeval tp;
@@ -28,15 +30,28 @@ inline double seconds(){
     return ((double)tp.tv_sec + (double)tp.tv_usec * 1.e-6);
 }
 
-void loadCSRSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCSRSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float* data, int* row, int* col, const int m, const long nnz);
 
-void loadCSCSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCSCSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float * data, int* row, int* col, const int n, const long nnz);
 
-void loadCooSparseMatrixRowPtrBin(const char* rowFile, int* row, const long nnz);
+bool loadCooSparseMatrixRowPtrBin(const std::string& rowFile, int* row, const long nnz);
 
-void loadCooSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCooSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float* data, int* row, int* col, const long nnz);
+
+
+#define MSG(msg)                            {std::cout << "ERROR: " << __FILE__ << " (line: " << __LINE__ << ") in " << __func__ << " :\n" << msg << std::endl;}
+
+#define MSG_FINAL(msg, act)                 {MSG(msg) {act}}
+
+#define CHECK_MSG(exp, msg)                 {if (!(exp))    {MSG(msg)}}
+#define CHECK_MSG_FINAL(exp, msg, act)      {if (!(exp))    {MSG_FINAL(msg, act)}}
+
+#define CHECK_MSG_RET(exp, msg, val)        CHECK_MSG_FINAL(exp, msg, return (val);)
+#define CHECK_MSG_RET_TRUE(exp, msg)        CHECK_MSG_RET(exp, msg, true)
+#define CHECK_MSG_RET_FALSE(exp, msg)       CHECK_MSG_RET(exp, msg, false)
+#define CHECK_MSG_RET_NULLPTR(exp, msg)     CHECK_MSG_RET(exp, msg, nullptr)
 
 #endif

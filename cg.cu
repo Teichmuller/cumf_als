@@ -27,7 +27,6 @@
 #include "device_utilities.h"
 #include "host_utilities.h"
 #include <fstream>
-#define SCAN_BATCH 24
 #define CG_ERROR 1e-4
 #undef DEBUG
 
@@ -726,7 +725,7 @@ void updateXWithCGHost(float * A, float * x, float * b, const int batchSize, con
 __global__ void
 __launch_bounds__(64)
 alsUpdateFeature100(const int batch_offset,
-		const int* csrRowIndex, const int* csrColIndex, const float lambda, const int m, const int F,
+		const int* csrRowIndex, const int* csrColIndex, const float lambda, const int m, const int f,
 		const float* thetaT, float* XT, float* ythetaT, int cgIter) {
 	extern __shared__ float2 thetaTemp[];
 	int row = blockIdx.x + batch_offset;
@@ -750,7 +749,7 @@ alsUpdateFeature100(const int batch_offset,
 		int tile_x = 0;
 		int tile_y = 0;
 
-		int tile = F/10;
+		int tile = f/10;
 		for ( int i = 0; i < 10; i++){
 			int end = ((20-i)*(i+1))/2;
 			if(threadIdx.x < end){
@@ -775,23 +774,23 @@ alsUpdateFeature100(const int batch_offset,
 						//IMPORTANT: for loop has constant and identical start and end
 						if(threadIdx.x < 32){
 							for (int k = 0; k < 50; k += 2){
-								theta.x = __ldg(&thetaT[ F * csrColIndex[start + iter*SCAN_BATCH + index] + k]);
-								theta.y = __ldg(&thetaT[ F * csrColIndex[start + iter*SCAN_BATCH + index] + k+1]);
-								thetaTemp[index * F/2 + k/2] = theta;
+								theta.x = __ldg(&thetaT[ f * csrColIndex[start + iter*SCAN_BATCH + index] + k]);
+								theta.y = __ldg(&thetaT[ f * csrColIndex[start + iter*SCAN_BATCH + index] + k+1]);
+								thetaTemp[index * f/2 + k/2] = theta;
 							}
 						}
 						else {
 							for (int k = 0; k < 50; k += 2){
-								theta.x = __ldg(&thetaT[ F * csrColIndex[start + iter*SCAN_BATCH + index] + k + 50]);
-								theta.y = __ldg(&thetaT[ F * csrColIndex[start + iter*SCAN_BATCH + index] + k + 51]);
-								thetaTemp[index * F/2 + k/2 + 25] = theta;
+								theta.x = __ldg(&thetaT[ f * csrColIndex[start + iter*SCAN_BATCH + index] + k + 50]);
+								theta.y = __ldg(&thetaT[ f * csrColIndex[start + iter*SCAN_BATCH + index] + k + 51]);
+								thetaTemp[index * f/2 + k/2 + 25] = theta;
 							}
 						}
 					}
 					//must be the last iteration; no need to check
 					//not enough theta to copy, set zero
 					else
-						memset(&thetaTemp[index*F/2], 0, F*sizeof(float));
+						memset(&thetaTemp[index*f/2], 0, f*sizeof(float));
 				}
 			}
 			__syncthreads();
@@ -825,8 +824,8 @@ alsUpdateFeature100(const int batch_offset,
 		float *rsnew = (float*)&thetaTemp[252];
 		float *beta = (float*)&thetaTemp[253];
 		//sharedx<--x
-		for(int k = threadIdx.x; k < F; k += 64){
-			sharedx[k] = XT[blockIdx.x*F + k];
+		for(int k = threadIdx.x; k < f; k += 64){
+			sharedx[k] = XT[blockIdx.x*f + k];
 			sharedax[k] = 0;
 		}
 		__syncthreads();
@@ -936,7 +935,7 @@ alsUpdateFeature100(const int batch_offset,
 			printf("\n\n");
 		}
 		#endif
-		for(int k = threadIdx.x; k < F; k += 64){
+		for(int k = threadIdx.x; k < f; k += 64){
 			//r=b-Ax
 			sharedr[k] = ythetaT[blockIdx.x*blockDim.x + k] - sharedax[k];
 			//p=r;
@@ -946,7 +945,7 @@ alsUpdateFeature100(const int batch_offset,
 		if(threadIdx.x == 0){
 			rsold[0] = 0;
 		}
-		for(int k = threadIdx.x; k < F; k += 64){
+		for(int k = threadIdx.x; k < f; k += 64){
 			temp += sharedr[k]*sharedr[k];
 		}
 		blockReduceSumWithAtomics(rsold, temp);	
@@ -978,7 +977,7 @@ alsUpdateFeature100(const int batch_offset,
 		//CG iterations
 		for(int iter = 0; iter < cgIter; iter++){
 			//ap=A*p;
-			for(int k = threadIdx.x; k < F; k += 64)
+			for(int k = threadIdx.x; k < f; k += 64)
 				sharedap[k] = 0;
 			__syncthreads();
 			//only uses 55 threads for A*p and A*x
@@ -1076,7 +1075,7 @@ alsUpdateFeature100(const int batch_offset,
 			//because there is a __syncthreads() in blockReduce
 			//pAp=p'*Ap
 			temp = 0;
-			for(int k = threadIdx.x; k < F; k += 64)
+			for(int k = threadIdx.x; k < f; k += 64)
 				temp += sharedp[k]*sharedap[k];		
 			//temp = blockReduceSum(shared, temp);
 			blockReduceSumWithAtomics(rsnew, temp);
@@ -1100,7 +1099,7 @@ alsUpdateFeature100(const int batch_offset,
 			}
 			//needed, aplpha[0] to be used by all threads
 			__syncthreads();
-			for(int k = threadIdx.x; k < F; k += 64){
+			for(int k = threadIdx.x; k < f; k += 64){
 				//x=x+alpha*p;
 				sharedx[k] = sharedx[k] + alpha[0] * sharedp[k];
 				//r=r-alpha*Ap;
@@ -1125,7 +1124,7 @@ alsUpdateFeature100(const int batch_offset,
 			#endif		
 			//rsnew=r'*r;
 			temp = 0;
-			for(int k = threadIdx.x; k < F; k += 64)
+			for(int k = threadIdx.x; k < f; k += 64)
 				temp += sharedr[k]*sharedr[k];
 			blockReduceSumWithAtomics(rsnew, temp);
 			//WARN: has to have this sync!
@@ -1160,7 +1159,7 @@ alsUpdateFeature100(const int batch_offset,
 			//need sync since every thread needs beta[0]
 			__syncthreads();
 			//p=r+(rsnew/rsold)*p;
-			for(int k = threadIdx.x; k < F; k += 64)
+			for(int k = threadIdx.x; k < f; k += 64)
 				sharedp[k] = sharedr[k] + beta[0] * sharedp[k];
 			//need sync as every thread needs sharedp at the beginning of for
 			__syncthreads();
@@ -1182,8 +1181,8 @@ alsUpdateFeature100(const int batch_offset,
 			#endif
 		}//end of CG iterations
 		//x<--sharedx
-		for(int k = threadIdx.x; k < F; k += 64)
-			XT[blockIdx.x*F + k] = sharedx[k];
+		for(int k = threadIdx.x; k < f; k += 64)
+			XT[blockIdx.x*f + k] = sharedx[k];
 //*/		
 	}
 }

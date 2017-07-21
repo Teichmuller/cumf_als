@@ -14,85 +14,85 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "host_utilities.h"
 #include <fstream>
 
-void loadCSRSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCSRSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float* data, int* row, int* col, const int m, const long nnz) {
 	#ifdef DEBUG
     printf("\n loading CSR...\n");
 	#endif
-	FILE *dFile = fopen(dataFile,"rb");
-	FILE *rFile = fopen(rowFile,"rb");
-	FILE *cFile = fopen(colFile,"rb");
-	if (!rFile||!dFile||!dFile)
-	{
-		printf("Unable to open file!");
-		return;
-	}
+	FILE *dFile = fopen(dataFile.data(), "rb");
+	FILE *rFile = fopen(rowFile.data(), "rb");
+	FILE *cFile = fopen(colFile.data(), "rb");
 
-	fread(&row[0], 4*(m+1) ,1, rFile);
-	fread(&col[0], 4*nnz ,1, cFile);
-	fread(&data[0], 4*nnz ,1, dFile);
+	CHECK_MSG_RET_FALSE(dFile, "Unable to open file " << dataFile << "!")
+	CHECK_MSG_RET_FALSE(rFile, "Unable to open file " << rowFile << "!")
+	CHECK_MSG_RET_FALSE(cFile, "Unable to open file " << colFile << "!")
+
+	CHECK_MSG_RET_FALSE(fread(&data[0], sizeof(data[0]), nnz, dFile) == nnz, "Loading Val failed!")
+	CHECK_MSG_RET_FALSE(fread(&row[0], sizeof(row[0]), m + 1, rFile) == m + 1, "Loading RI failed!")
+	CHECK_MSG_RET_FALSE(fread(&col[0], sizeof(col[0]), nnz, cFile) == nnz, "Loading CI failed!")
 
 	fclose(rFile);
 	fclose(dFile);
 	fclose(cFile);
+	return true;
 }
 
-void loadCSCSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCSCSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float * data, int* row, int* col, const int n, const long nnz) {
 	#ifdef DEBUG		
     printf("\n loading CSC...\n");
 	#endif
+	FILE *dFile = fopen(dataFile.data(), "rb");
+	FILE *rFile = fopen(rowFile.data(), "rb");
+	FILE *cFile = fopen(colFile.data(), "rb");
 
-	FILE *dFile = fopen(dataFile,"rb");
-	FILE *rFile = fopen(rowFile,"rb");
-	FILE *cFile = fopen(colFile,"rb");
-	if (!rFile||!dFile||!dFile)
-	{
-		printf("Unable to open file!");
-		return;
-	}
+	CHECK_MSG_RET_FALSE(dFile, "Unable to open file " << dataFile << "!")
+	CHECK_MSG_RET_FALSE(rFile, "Unable to open file " << rowFile << "!")
+	CHECK_MSG_RET_FALSE(cFile, "Unable to open file " << colFile << "!")
 
-	fread(&row[0], 4*nnz ,1, rFile);
-	fread(&col[0], 4*(n+1) ,1, cFile);
-	fread(&data[0], 4*nnz ,1, dFile);
+	CHECK_MSG_RET_FALSE(fread(&data[0], sizeof(data[0]), nnz, dFile) == nnz, "Loading Val failed!")
+	CHECK_MSG_RET_FALSE(fread(&row[0], sizeof(row[0]), nnz, rFile) == nnz, "Loading RI failed!")
+	CHECK_MSG_RET_FALSE(fread(&col[0], sizeof(col[0]), n + 1, cFile) == n + 1, "Loading CI failed!")
 
-	fclose(rFile);
 	fclose(dFile);
+	fclose(rFile);
 	fclose(cFile);
+	return true;
 }
 
-void loadCooSparseMatrixRowPtrBin(const char* rowFile, int* row, const long nnz) {
+bool loadCooSparseMatrixRowPtrBin(const std::string& rowFile, int* row, const long nnz) {
 	#ifdef DEBUG
     printf("\n loading COO Row...\n");
 	#endif
-	FILE *rfile = fopen(rowFile,"rb");
-	fread(&row[0], 4*nnz ,1, rfile);
-	fclose(rfile);
+	FILE *rFile = fopen(rowFile.data(), "rb");
+	CHECK_MSG_RET_FALSE(fread(&row[0], sizeof(row[0]), nnz, rFile) == nnz, "Loading RI failed!")
+	fclose(rFile);
+	return true;
 }
 
-void loadCooSparseMatrixBin(const char* dataFile, const char* rowFile, const char* colFile,
+bool loadCooSparseMatrixBin(const std::string& dataFile, const std::string& rowFile, const std::string& colFile,
 		float* data, int* row, int* col, const long nnz) {
 	#ifdef DEBUG
     printf("\n loading COO...\n");
 	#endif
+	FILE *dFile = fopen(dataFile.data(), "rb");
+	FILE *rFile = fopen(rowFile.data(), "rb");
+	FILE *cFile = fopen(colFile.data(), "rb");
 
-	FILE *dFile = fopen(dataFile,"rb");
-	FILE *rFile = fopen(rowFile,"rb");
-	FILE *cFile = fopen(colFile,"rb");
-	if (!rFile||!dFile||!cFile)
-	{
-		printf("Unable to open file!");
-		return;
-	}
+	CHECK_MSG_RET_FALSE(dFile, "Unable to open file " << dataFile << "!")
+	CHECK_MSG_RET_FALSE(rFile, "Unable to open file " << rowFile << "!")
+	CHECK_MSG_RET_FALSE(cFile, "Unable to open file " << colFile << "!")
 
-	fread(&row[0], 4*nnz, 1, rFile);
-	fread(&col[0], 4*nnz, 1, cFile);
-	fread(&data[0], 4*nnz, 1, dFile);
+	CHECK_MSG_RET_FALSE(fread(&data[0], sizeof(data[0]), nnz, dFile) == nnz, "Loading Val failed!")
+	CHECK_MSG_RET_FALSE(fread(&row[0], sizeof(row[0]), nnz, rFile) == nnz, "Loading RI failed!")
+	CHECK_MSG_RET_FALSE(fread(&col[0], sizeof(col[0]), nnz, cFile) == nnz, "Loading CI failed!")
 
-	fclose(rFile);
 	fclose(dFile);
+	fclose(rFile);
 	fclose(cFile);
+	return true;
 }
 

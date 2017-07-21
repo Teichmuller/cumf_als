@@ -2,6 +2,8 @@
 #define DEVICE_UTILITIES_H_
 #define WARP_SIZE 32
 #include <cuda_fp16.h> 
+#include <iostream>
+#include "als.h"
 
 //WARP shuffling code adopted from here:
 //https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
@@ -47,6 +49,21 @@ void blockReduceSumWithAtomics(float *out,float val) {
 	}
 }
 
+__inline__ __device__ double atomicDAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull =
+                                          (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val +
+                        __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+
+void saveDeviceFloatArrayToFile(const std::string& fileName, int size, dtype* d_array);
 __global__ void fp32Array2fp16Array(const float * fp32Array, half* fp16Array, const int size);
 __global__ void fp16Array2fp32Array(float * fp32Array, const half* fp16Array, const int size);
 

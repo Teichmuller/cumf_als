@@ -5,6 +5,10 @@ Fork from [here](https://github.com/cuMF/cumf_als).
 
 ## Major Changes
 
+* 7/21/2017
+  * Change MaxIter from a constant to an argument
+  * Removed unused code
+  * Added comparison script to numpy implementation
 * 7/9/2017
   * Added tested smoothing term
 * 6/30/2017
@@ -12,4 +16,5 @@ Fork from [here](https://github.com/cuMF/cumf_als).
   * Added tested 64-bit floating point feature, which could be enabled by uncommenting USE_DOUBLE
 
 ### TODO
+- [ ] Multi-GPU support
 - [ ] Refactoring
